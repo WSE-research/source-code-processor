@@ -1,14 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
-<parent>
   <groupId>org.wseresearch</groupId>
-  <artifactId>my-project</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <relativePath>../pom.xml</relativePath>
-</parent>
-
   <version>0.0.1</version>
-  <artifactId>processor</artifactId>
+  <artifactId>source-code-processor</artifactId>
 
   <dependencies>
     <dependency>
@@ -17,17 +11,18 @@
       <version>1.1.1</version>
       <scope>provided</scope>
     </dependency>
-      <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter</artifactId>
-    <version>3.1.0</version>
-      </dependency>
-      <dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+      <version>3.1.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
       <version>0.10.2</version>
     </dependency>
   </dependencies>
+
   <build>
     <plugins>
       <plugin>
@@ -41,4 +36,5 @@
       </plugin>
     </plugins>
   </build>
+
 </project>

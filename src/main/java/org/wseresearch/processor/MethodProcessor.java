@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 public class MethodProcessor extends AbstractProcessor {
 
     private List<MethodInfo> methods = new ArrayList<>();
+    private final String SOURCE_CODE_NOT_FOUND_FOR_CLASS = "No source code available";
+    private final String SOURCE_CODE_NOT_FOUNT_FOR_METHOD = "Source code not found";
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -59,14 +61,11 @@ public class MethodProcessor extends AbstractProcessor {
     private void generateRegistry() {
         try {
             String randomSuffix = UUID.randomUUID().toString().replace("-", "");
-//            JavaFileObject file = processingEnv.getFiler().createSourceFile("generated.MethodRegistry" + randomSuffix);
             JavaFileObject file = processingEnv.getFiler().createSourceFile("org.wseresearch.processor.MethodRegistry", (Element[]) null);
             try (PrintWriter out = new PrintWriter(file.openWriter())) {
                 out.println("package org.wseresearch.processor;");
                 out.println("import java.util.*;");
                 out.println("import org.wseresearch.processor.MethodInfo;");
-//                out.println("import org.wseresearch.processor.MethodRegistryIF;");
-                //out.println("public class MethodRegistry implements MethodRegistryIF {");
                 out.printf("public class MethodRegistry {");
                 out.println("  public static List<MethodInfo> getMethods() {");
                 out.println("    return List.of(");
@@ -99,9 +98,6 @@ public class MethodProcessor extends AbstractProcessor {
      * and special characters.
      */
     private String escapeSourceCode(String sourceCode) {
-        if (sourceCode == null) {
-            return "No source code available";
-        }
         // Escape backslashes and quotes, then replace newlines with \n
         return sourceCode
             .replace("\\", "\\\\")
@@ -112,35 +108,44 @@ public class MethodProcessor extends AbstractProcessor {
     
     /**
      * Finds the source file for a given method with the use of JavaParser.
-     * @param method
+     * @param methodName
      * @return
      */
     public String getSourceCodeForMethod(String fqn, String methodName, List<String> parameterTypes) {
         Path sourceFilePath = getSourceFilePath(fqn);
         CompilationUnit cu;
         try {
+            // Transform source file to compilationUnit
             cu = com.github.javaparser.StaticJavaParser.parse(sourceFilePath.toFile());
         } catch (IOException e) {
-            e.printStackTrace();
-            return "Error";
+            return SOURCE_CODE_NOT_FOUND_FOR_CLASS;
         }
         Optional<MethodDeclaration> methodDeclaration = findMethodInCompilationUnit(cu, methodName, parameterTypes);
         if (methodDeclaration.isPresent()) {
             MethodDeclaration md = methodDeclaration.get();
             return (md.getDeclarationAsString(true, true, true) + " " + md.getBody().orElse(null));
         }
-        return "Error2";
+        return SOURCE_CODE_NOT_FOUNT_FOR_METHOD;
     }
 
+    /**
+     *
+     * @param cu CompilationUnit of the class file where the requested method should be accessible
+     * @param methodName Name of the method (i.e. getA - not getA())
+     * @param parameterTypes Parameter signature to check for overloaded methods
+     * @return MethodDeclaration
+     */
     private Optional<MethodDeclaration> findMethodInCompilationUnit(CompilationUnit cu, String methodName, List<String> parameterTypes) {
+        // Filter all methods with the passed methodName
         List<MethodDeclaration> possibleMethods = cu.findAll(com.github.javaparser.ast.body.MethodDeclaration.class).stream()
             .filter(md -> md.getNameAsString().equals(methodName))
             .collect(Collectors.toList());
 
         if (possibleMethods.size() == 1) {
-            return Optional.of(possibleMethods.get(0));
+            return Optional.of(possibleMethods.get(0)); // No overloaded methods, return the only occurrence
+
         } else if (possibleMethods.size() > 1) {
-            // If there are multiple methods with the same name, we can try to match by parameter types
+            // If there are multiple methods with the same name, we match by parameter types
             for (MethodDeclaration md : possibleMethods) {
                 List<String> paramTypes = md.getParameters().stream()
                     .map(p -> p.getType().asString())
@@ -154,12 +159,11 @@ public class MethodProcessor extends AbstractProcessor {
     }
 
     /**
-     * 
+     * Given the fully qualified name of a class (i.e. packages and class) get the path of it
      * @param fqn Fully Qualified Name of the class file (e.g., "com.example.MyClass")
      * @return
      */
     public Path getSourceFilePath(String fqn) {
-        // Assumes source files are in "src/main/java" relative to project root
         String baseDir = "src/main/java";
         String relativePath = fqn.replace('.', '/') + ".java";
         return Path.of(baseDir, relativePath);

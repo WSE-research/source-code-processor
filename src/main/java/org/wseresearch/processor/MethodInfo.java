@@ -4,12 +4,11 @@ import java.util.List;
 
 public class MethodInfo {
 
-    public String packageName, methodName, returnType, className, sourceCode;
+    public String fqn, methodName, returnType, sourceCode;
     public List<String> parameterTypes;
 
-    public MethodInfo(String packageName, String className, String methodName, String returnType, String sourceCode, List<String> parameterTypes) {
-        this.packageName = packageName;
-        this.className = className;
+    public MethodInfo(String fqn, String methodName, String returnType, String sourceCode, List<String> parameterTypes) {
+        this.fqn = fqn;
         this.methodName = methodName;
         this.returnType = returnType;
         this.sourceCode = sourceCode;
@@ -24,24 +23,12 @@ public class MethodInfo {
         this.sourceCode = sourceCode;
     }
 
-    public String getClassName() {
-        return className;
-    }
-
-    public void setClassName(String className) {
-        this.className = className;
-    }
-
     public List<String> getParameterTypes() {
         return parameterTypes;
     }
 
     public String getMethodName() {
         return methodName;
-    }
-
-    public String getPackageName() {
-        return packageName;
     }
 
     public String getReturnType() {
@@ -52,10 +39,6 @@ public class MethodInfo {
         this.methodName = methodName;
     }
 
-    public void setPackageName(String packageName) {
-        this.packageName = packageName;
-    }
-
     public void setParameterTypes(List<String> parameterTypes) {
         this.parameterTypes = parameterTypes;
     }
@@ -64,11 +47,18 @@ public class MethodInfo {
         this.returnType = returnType;
     }
 
+    public String getFqn() {
+        return fqn;
+    }
+
+    public void setFqn(String fqn) {
+        this.fqn = fqn;
+    }
+
     @Override
     public String toString() {
         return "MethodInfo{" +
-                "packageName='" + packageName + '\'' +
-                ", className='" + className + '\'' +
+                "FQN='" + fqn + '\'' +
                 ", methodName='" + methodName + '\'' +
                 ", returnType='" + returnType + '\'' +
                 ", sourceCode='" + sourceCode + '\'' +

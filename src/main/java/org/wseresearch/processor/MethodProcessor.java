@@ -3,20 +3,18 @@ package org.wseresearch.processor;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.google.auto.service.AutoService;
+
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
-import java.io.PrintWriter;
 import java.io.IOException;
-import java.util.*;
-import java.lang.reflect.Field;
+import java.io.PrintWriter;
 import java.nio.file.Path;
-
-import org.checkerframework.checker.units.qual.s;
-import org.wseresearch.processor.MethodInfo;
-import java.util.UUID;
-import java.util.stream.Collector;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @AutoService(Processor.class)
@@ -35,16 +33,15 @@ public class MethodProcessor extends AbstractProcessor {
                 for (Element enclosed : e.getEnclosedElements()) {
                     if (enclosed.getKind() == ElementKind.METHOD) {
                         ExecutableElement method = (ExecutableElement) enclosed;
-                        String packageName = processingEnv.getElementUtils().getPackageOf(method).toString();
-                        String className = ((TypeElement) e).getQualifiedName().toString();
+                        String fqn = ((TypeElement) e).getQualifiedName().toString();
                         String methodName = method.getSimpleName().toString();
                         String returnType = method.getReturnType().toString();
                         List<String> parameterTypes = method.getParameters()
-                            .stream()
-                            .map(p -> p.asType().toString())
-                            .collect(Collectors.toList());
-                        String sourceCode = escapeSourceCode(getSourceCodeForMethod(className, methodName, parameterTypes));
-                        MethodInfo methodInfo = new MethodInfo(packageName, className, methodName, returnType, "\"" + sourceCode + "\"", parameterTypes);
+                                .stream()
+                                .map(p -> p.asType().toString())
+                                .collect(Collectors.toList());
+                        String sourceCode = escapeSourceCode(getSourceCodeForMethod(fqn, methodName, parameterTypes));
+                        MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, "\"" + sourceCode + "\"", parameterTypes);
                         this.methods.add(methodInfo);
                     }
                 }
@@ -67,19 +64,30 @@ public class MethodProcessor extends AbstractProcessor {
                 out.println("import java.util.*;");
                 out.println("import org.wseresearch.processor.MethodInfo;");
                 out.printf("public class MethodRegistry {");
-                out.println("  public static List<MethodInfo> getMethods() {");
-                out.println("    return List.of(");
+                out.println("private static final String METHOD_DOESNT_EXIST_ERROR_MESSAGE = \"The requested method does not exist\";");
+                out.println("  public static List<MethodInfo> methods = ");
+                out.println("    List.of(");
                 for (int i = 0; i < methods.size(); i++) {
                     MethodInfo m = methods.get(i);
                     String paramTypes = m.parameterTypes.stream()
-                        .map(pt -> "\"" + escape(pt) + "\"")
-                        .collect(Collectors.joining(", ", "List.of(", ")"));
-                    out.printf("      new MethodInfo(\"%s\", \"%s\",\"%s\", \"%s\", %s, %s)%s%n",
-                            escape(m.packageName), escape(m.className), escape(m.methodName), 
+                            .map(pt -> "\"" + escape(pt) + "\"")
+                            .collect(Collectors.joining(", ", "List.of(", ")"));
+                    out.printf("      new MethodInfo(\"%s\",\"%s\", \"%s\", %s, %s)%s%n",
+                            escape(m.fqn), escape(m.methodName),
                             escape(m.returnType), m.getSourceCode(), paramTypes,
                             (i < methods.size() - 1 ? "," : ""));
                 }
-                out.println("    );");
+                out.println(");");
+                out.println("public static MethodInfo getMethod(String fqn, String methodName, List<String> parameterTypes) {");
+                out.println("   for (MethodInfo method : methods) {");
+                out.println("      if (method.fqn.equals(fqn) && method.methodName.equals(methodName)) {");
+                out.println("        List<String> paramTypes = method.getParameterTypes();");
+                out.println("        if (paramTypes.equals(parameterTypes)) {");
+                out.println("            return method;");
+                out.println("        } else continue;");
+                out.println("     }");
+                out.println("  }");
+                out.println("  throw new NoSuchMethodError(METHOD_DOESNT_EXIST_ERROR_MESSAGE);");
                 out.println("  }");
                 out.println("}");
             }
@@ -92,7 +100,7 @@ public class MethodProcessor extends AbstractProcessor {
         if (code == null) return "null";
         return code.replace("\\", "\\\\").replace("\"", "\\\"");
     }
-    
+
     /**
      * Escapes source code for inclusion in a Java string literal, handling multi-line content
      * and special characters.
@@ -100,14 +108,15 @@ public class MethodProcessor extends AbstractProcessor {
     private String escapeSourceCode(String sourceCode) {
         // Escape backslashes and quotes, then replace newlines with \n
         return sourceCode
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\r", "")
-            .replace("\n", "  ");
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "")
+                .replace("\n", "  ");
     }
-    
+
     /**
      * Finds the source file for a given method with the use of JavaParser.
+     *
      * @param methodName
      * @return
      */
@@ -129,17 +138,16 @@ public class MethodProcessor extends AbstractProcessor {
     }
 
     /**
-     *
-     * @param cu CompilationUnit of the class file where the requested method should be accessible
-     * @param methodName Name of the method (i.e. getA - not getA())
+     * @param cu             CompilationUnit of the class file where the requested method should be accessible
+     * @param methodName     Name of the method (i.e. getA - not getA())
      * @param parameterTypes Parameter signature to check for overloaded methods
      * @return MethodDeclaration
      */
     private Optional<MethodDeclaration> findMethodInCompilationUnit(CompilationUnit cu, String methodName, List<String> parameterTypes) {
         // Filter all methods with the passed methodName
         List<MethodDeclaration> possibleMethods = cu.findAll(com.github.javaparser.ast.body.MethodDeclaration.class).stream()
-            .filter(md -> md.getNameAsString().equals(methodName))
-            .collect(Collectors.toList());
+                .filter(md -> md.getNameAsString().equals(methodName))
+                .collect(Collectors.toList());
 
         if (possibleMethods.size() == 1) {
             return Optional.of(possibleMethods.get(0)); // No overloaded methods, return the only occurrence
@@ -148,8 +156,8 @@ public class MethodProcessor extends AbstractProcessor {
             // If there are multiple methods with the same name, we match by parameter types
             for (MethodDeclaration md : possibleMethods) {
                 List<String> paramTypes = md.getParameters().stream()
-                    .map(p -> p.getType().asString())
-                    .collect(Collectors.toList());
+                        .map(p -> p.getType().asString())
+                        .collect(Collectors.toList());
                 if (paramTypes.equals(parameterTypes)) {
                     return Optional.of(md);
                 }
@@ -160,6 +168,7 @@ public class MethodProcessor extends AbstractProcessor {
 
     /**
      * Given the fully qualified name of a class (i.e. packages and class) get the path of it
+     *
      * @param fqn Fully Qualified Name of the class file (e.g., "com.example.MyClass")
      * @return
      */

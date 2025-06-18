@@ -1,6 +1,6 @@
-org/wseresearch/processor/SourceCodeParser.class
 org/wseresearch/processor/MethodProcessor.class
 org/wseresearch/processor/MethodInfo.class
 org/wseresearch/processor/MethodRegistry.class
 org/wseresearch/processor/MethodRegistryOld.class
+org/wseresearch/processor/MethodRegistryNew.class
 org/wseresearch/processor/MethodRegistryIF.class

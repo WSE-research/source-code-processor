@@ -3,6 +3,8 @@ package org.wseresearch.processor;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.google.auto.service.AutoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -10,9 +12,12 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Writer;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,9 +27,11 @@ import java.util.stream.Collectors;
 @SupportedSourceVersion(SourceVersion.RELEASE_11)
 public class MethodProcessor extends AbstractProcessor {
 
+    private Map<String, List<MethodInfo>> packageMethodMap = new HashMap<>();
     private List<MethodInfo> methods = new ArrayList<>();
     private final String SOURCE_CODE_NOT_FOUND_FOR_CLASS = "No source code available";
     private final String SOURCE_CODE_NOT_FOUNT_FOR_METHOD = "Source code not found";
+    private Logger logger = LoggerFactory.getLogger(MethodProcessor.class);
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -42,6 +49,7 @@ public class MethodProcessor extends AbstractProcessor {
                                 .collect(Collectors.toList());
                         String sourceCode = escapeSourceCode(getSourceCodeForMethod(fqn, methodName, parameterTypes));
                         MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, "\"" + sourceCode + "\"", parameterTypes);
+                        addMethodToMap(methodInfo);
                         this.methods.add(methodInfo);
                     }
                 }
@@ -50,9 +58,50 @@ public class MethodProcessor extends AbstractProcessor {
 
         if (roundEnv.processingOver() && !methods.isEmpty()) {
             generateRegistry();
+            generateFileRegistry();
         }
 
         return false;
+    }
+
+    private void addMethodToMap(MethodInfo methodInfo) {
+        String fqn = methodInfo.getFqn();
+        logger.info("FQN: {}", fqn);
+        if (!packageMethodMap.containsKey(fqn)) {
+            ArrayList<MethodInfo> methods = new ArrayList<>();
+            methods.add(methodInfo);
+            packageMethodMap.put(fqn, methods);
+        } else {
+            packageMethodMap.get(fqn).add(methodInfo);
+        }
+    }
+
+    private void generateFileRegistry() {
+        packageMethodMap.forEach((k, v) -> {
+            try {
+                FileObject file = processingEnv.getFiler().createResource(
+                        StandardLocation.CLASS_OUTPUT,
+                        "",
+                        "jsons/" + k.toString() + ".json"
+                );
+
+                try (Writer writer = file.openWriter()) {
+                    writer.write("{");
+                    writer.write("\"methods\": [");
+                    for (int i = 0; i < v.size(); i++) {
+                        MethodInfo method = v.get(i);
+                        writer.write(method.getJsonRepresentation());
+                        if (i < v.size() - 1) {
+                            writer.write(",");
+                        }
+                    }
+                    writer.write("]");
+                    writer.write("}");
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     private void generateRegistry() {

@@ -1,5 +1,6 @@
 package org.wseresearch.processor;
 
+import java.io.StringWriter;
 import java.util.List;
 
 public class MethodInfo {
@@ -64,5 +65,25 @@ public class MethodInfo {
                 ", sourceCode='" + sourceCode + '\'' +
                 ", parameterTypes=" + parameterTypes +
                 '}';
+    }
+
+    public String getJsonRepresentation() {
+        StringWriter writer = new StringWriter();
+        writer.write("{");
+        writer.write("\"fqn\": \"" + this.getFqn() + "\",");
+        writer.write("\"methodName\": \"" + this.getMethodName() + "\",");
+        writer.write("\"returnType\": \"" + this.getReturnType() + "\",");
+        writer.write("\"sourceCode\": " + this.getSourceCode() + ",");
+        writer.write("\"parameterTypes\": [");
+        List<String> params = this.getParameterTypes();
+        for (int j = 0; j < params.size(); j++) {
+            writer.write("\"" + params.get(j) + "\"");
+            if (j < params.size() - 1) {
+                writer.write(",");
+            }
+        }
+        writer.write("]");
+        writer.write("}");
+        return writer.toString();
     }
 }

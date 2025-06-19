@@ -3,8 +3,6 @@ package org.wseresearch.processor;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.google.auto.service.AutoService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -13,10 +11,8 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.FileObject;
-import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.nio.file.Path;
 import java.util.*;
@@ -31,7 +27,6 @@ public class MethodProcessor extends AbstractProcessor {
     private List<MethodInfo> methods = new ArrayList<>();
     private final String SOURCE_CODE_NOT_FOUND_FOR_CLASS = "No source code available";
     private final String SOURCE_CODE_NOT_FOUNT_FOR_METHOD = "Source code not found";
-    private Logger logger = LoggerFactory.getLogger(MethodProcessor.class);
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -57,16 +52,13 @@ public class MethodProcessor extends AbstractProcessor {
         }
 
         if (roundEnv.processingOver() && !methods.isEmpty()) {
-            generateRegistry();
             generateFileRegistry();
         }
-
         return false;
     }
 
     private void addMethodToMap(MethodInfo methodInfo) {
         String fqn = methodInfo.getFqn();
-        logger.info("FQN: {}", fqn);
         if (!packageMethodMap.containsKey(fqn)) {
             ArrayList<MethodInfo> methods = new ArrayList<>();
             methods.add(methodInfo);
@@ -102,52 +94,6 @@ public class MethodProcessor extends AbstractProcessor {
                 throw new RuntimeException(e);
             }
         });
-    }
-
-    private void generateRegistry() {
-        try {
-            String randomSuffix = UUID.randomUUID().toString().replace("-", "");
-            JavaFileObject file = processingEnv.getFiler().createSourceFile("org.wseresearch.processor.MethodRegistry", (Element[]) null);
-            try (PrintWriter out = new PrintWriter(file.openWriter())) {
-                out.println("package org.wseresearch.processor;");
-                out.println("import java.util.*;");
-                out.println("import org.wseresearch.processor.MethodInfo;");
-                out.printf("public class MethodRegistry {");
-                out.println("private static final String METHOD_DOESNT_EXIST_ERROR_MESSAGE = \"The requested method does not exist\";");
-                out.println("  public static List<MethodInfo> methods = ");
-                out.println("    List.of(");
-                for (int i = 0; i < methods.size(); i++) {
-                    MethodInfo m = methods.get(i);
-                    String paramTypes = m.parameterTypes.stream()
-                            .map(pt -> "\"" + escape(pt) + "\"")
-                            .collect(Collectors.joining(", ", "List.of(", ")"));
-                    out.printf("      new MethodInfo(\"%s\",\"%s\", \"%s\", %s, %s)%s%n",
-                            escape(m.fqn), escape(m.methodName),
-                            escape(m.returnType), m.getSourceCode(), paramTypes,
-                            (i < methods.size() - 1 ? "," : ""));
-                }
-                out.println(");");
-                out.println("public static MethodInfo getMethod(String fqn, String methodName, List<String> parameterTypes) {");
-                out.println("   for (MethodInfo method : methods) {");
-                out.println("      if (method.fqn.equals(fqn) && method.methodName.equals(methodName)) {");
-                out.println("        List<String> paramTypes = method.getParameterTypes();");
-                out.println("        if (paramTypes.equals(parameterTypes)) {");
-                out.println("            return method;");
-                out.println("        } else continue;");
-                out.println("     }");
-                out.println("  }");
-                out.println("  throw new NoSuchMethodError(METHOD_DOESNT_EXIST_ERROR_MESSAGE);");
-                out.println("  }");
-                out.println("}");
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private String escape(String code) {
-        if (code == null) return "null";
-        return code.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     /**

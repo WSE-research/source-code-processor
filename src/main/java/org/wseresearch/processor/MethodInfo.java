@@ -1,6 +1,7 @@
 package org.wseresearch.processor;
 
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MethodInfo {
@@ -8,12 +9,17 @@ public class MethodInfo {
     public String fqn, methodName, returnType, sourceCode;
     public List<String> parameterTypes;
 
+    // Default constructor for Jackson deserialization
+    public MethodInfo() {
+        this.parameterTypes = new ArrayList<>();
+    }
+
     public MethodInfo(String fqn, String methodName, String returnType, String sourceCode, List<String> parameterTypes) {
         this.fqn = fqn;
         this.methodName = methodName;
         this.returnType = returnType;
         this.sourceCode = sourceCode;
-        this.parameterTypes = parameterTypes;
+        this.parameterTypes = parameterTypes != null ? parameterTypes : new ArrayList<>();
     }
 
     public String getSourceCode() {

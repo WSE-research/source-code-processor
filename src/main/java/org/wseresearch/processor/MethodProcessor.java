@@ -74,7 +74,7 @@ public class MethodProcessor extends AbstractProcessor {
                 FileObject file = processingEnv.getFiler().createResource(
                         StandardLocation.CLASS_OUTPUT,
                         "",
-                        "jsons/" + k.toString() + ".json"
+                        "jsons/" + k + ".json"
                 );
 
                 try (Writer writer = file.openWriter()) {
@@ -112,8 +112,8 @@ public class MethodProcessor extends AbstractProcessor {
     /**
      * Finds the source file for a given method with the use of JavaParser.
      *
-     * @param methodName
-     * @return
+     * @param methodName Name of the method without '()'
+     * @return Source code as string for requested method
      */
     public String getSourceCodeForMethod(String fqn, String methodName, List<String> parameterTypes) {
         Path sourceFilePath = getSourceFilePath(fqn);
@@ -165,7 +165,7 @@ public class MethodProcessor extends AbstractProcessor {
      * Given the fully qualified name of a class (i.e. packages and class) get the path of it
      *
      * @param fqn Fully Qualified Name of the class file (e.g., "com.example.MyClass")
-     * @return
+     * @return Path of source file
      */
     public Path getSourceFilePath(String fqn) {
         String baseDir = "src/main/java";

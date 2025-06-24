@@ -6,7 +6,7 @@ import java.util.List;
 
 public class MethodInfo {
 
-    public String fqn, methodName, returnType, sourceCode;
+    public String fqn, methodName, returnType, sourceCode, javadoc;
     public List<String> parameterTypes;
 
     // Default constructor for Jackson deserialization
@@ -14,12 +14,28 @@ public class MethodInfo {
         this.parameterTypes = new ArrayList<>();
     }
 
-    public MethodInfo(String fqn, String methodName, String returnType, String sourceCode, List<String> parameterTypes) {
+    public MethodInfo(String fqn, String methodName, String returnType, String sourceCode, String javadoc, List<String> parameterTypes) {
         this.fqn = fqn;
         this.methodName = methodName;
         this.returnType = returnType;
         this.sourceCode = sourceCode;
+        this.javadoc = javadoc;
         this.parameterTypes = parameterTypes != null ? parameterTypes : new ArrayList<>();
+    }
+
+    public MethodInfo(String fqn, String methodName, String returnType, List<String> parameterTypes) {
+        this.fqn = fqn;
+        this.methodName = methodName;
+        this.returnType = returnType;
+        this.parameterTypes = parameterTypes != null ? parameterTypes : new ArrayList<>();
+    }
+
+    public String getJavadoc() {
+        return javadoc;
+    }
+
+    public void setJavadoc(String javadoc) {
+        this.javadoc = javadoc;
     }
 
     public String getSourceCode() {
@@ -69,6 +85,7 @@ public class MethodInfo {
                 ", methodName='" + methodName + '\'' +
                 ", returnType='" + returnType + '\'' +
                 ", sourceCode='" + sourceCode + '\'' +
+                ", javadoc='" + javadoc + '\'' +
                 ", parameterTypes=" + parameterTypes +
                 '}';
     }
@@ -80,6 +97,7 @@ public class MethodInfo {
         writer.write("\"methodName\": \"" + this.getMethodName() + "\",");
         writer.write("\"returnType\": \"" + this.getReturnType() + "\",");
         writer.write("\"sourceCode\": " + this.getSourceCode() + ",");
+        writer.write("\"javadoc\": " + this.getJavadoc() + ",");
         writer.write("\"parameterTypes\": [");
         List<String> params = this.getParameterTypes();
         for (int j = 0; j < params.size(); j++) {

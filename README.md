@@ -8,7 +8,7 @@ This annotation processor aims to parse source code at compile-time to provide i
 
 ### Implementation
 
-To use this annotation processor for your application, add the dependency as well as the maven-compiler plugin with the annotationProcessor as annotationProcessorPath.
+To use this annotation processor for your application, add the dependency as well as the maven-compiler plugin with the annotationProcessor (source-code-processor) as annotationProcessorPath.
 
 **Dependency:**
 
@@ -16,7 +16,7 @@ To use this annotation processor for your application, add the dependency as wel
 <dependency>
   <groupId>org.wseresearch</groupId>
   <artifactId>source-code-processor</artifactId>
-  <version>0.0.1</version>
+  <version>[0.0.1,1.0)</version>
 </dependency>
 ```
 

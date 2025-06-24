@@ -3,6 +3,8 @@ package org.wseresearch.processor;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.google.auto.service.AutoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 @SupportedSourceVersion(SourceVersion.RELEASE_11)
 public class MethodProcessor extends AbstractProcessor {
 
+    private final static Logger logger = LoggerFactory.getLogger(MethodProcessor.class);
     private Map<String, List<MethodInfo>> packageMethodMap = new HashMap<>();
     private List<MethodInfo> methods = new ArrayList<>();
     private final String SOURCE_CODE_NOT_FOUND_FOR_CLASS = "No source code available";
@@ -42,8 +45,8 @@ public class MethodProcessor extends AbstractProcessor {
                                 .stream()
                                 .map(p -> p.asType().toString())
                                 .collect(Collectors.toList());
-                        String sourceCode = escapeSourceCode(getSourceCodeForMethod(fqn, methodName, parameterTypes));
-                        MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, "\"" + sourceCode + "\"", parameterTypes);
+                        MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, parameterTypes);
+                        methodInfo = addInformationToMethod(methodInfo);
                         addMethodToMap(methodInfo);
                         this.methods.add(methodInfo);
                     }
@@ -109,27 +112,58 @@ public class MethodProcessor extends AbstractProcessor {
                 .replace("\n", "  ");
     }
 
-    /**
-     * Finds the source file for a given method with the use of JavaParser.
-     *
-     * @param methodName Name of the method without '()'
-     * @return Source code as string for requested method
-     */
-    public String getSourceCodeForMethod(String fqn, String methodName, List<String> parameterTypes) {
+    public Optional<MethodDeclaration> getMethodDeclaration(String fqn, String methodName, List<String> parameterTypes) throws SourceCodeNotExistentException {
         Path sourceFilePath = getSourceFilePath(fqn);
         CompilationUnit cu;
         try {
             // Transform source file to compilationUnit
             cu = com.github.javaparser.StaticJavaParser.parse(sourceFilePath.toFile());
         } catch (IOException e) {
-            return SOURCE_CODE_NOT_FOUND_FOR_CLASS;
+            throw new SourceCodeNotExistentException(SOURCE_CODE_NOT_FOUND_FOR_CLASS);
         }
-        Optional<MethodDeclaration> methodDeclaration = findMethodInCompilationUnit(cu, methodName, parameterTypes);
-        if (methodDeclaration.isPresent()) {
-            MethodDeclaration md = methodDeclaration.get();
-            return (md.getDeclarationAsString(true, true, true) + " " + md.getBody().orElse(null));
+        return findMethodInCompilationUnit(cu, methodName, parameterTypes);
+    }
+
+    public MethodInfo addInformationToMethod(MethodInfo method) {
+        String sourceCode, javadoc;
+        try {
+            Optional<MethodDeclaration> md = getMethodDeclaration(method.getFqn(), method.getMethodName(), method.getParameterTypes());
+            if (md.isPresent()) {
+                MethodDeclaration methodDeclaration = md.get();
+                if(methodDeclaration.getJavadoc().isPresent()) {
+                    javadoc = cleanTextForRDF(methodDeclaration.getJavadoc().get().toText());
+                } else {
+                    javadoc = "";
+                }
+                sourceCode = cleanTextForRDF(
+                        methodDeclaration.getDeclarationAsString(
+                                true,
+                                true,
+                                true)
+                                + " " + methodDeclaration.getBody().orElse(null)
+                );
+            }
+            else throw new SourceCodeNotExistentException(SOURCE_CODE_NOT_FOUNT_FOR_METHOD);
+        } catch (SourceCodeNotExistentException e) {
+            logger.error("Failed to find source code for fqn: {}, methodName: {}, parameterTypes: {}", method.getFqn(), method.getMethodName(), method.getParameterTypes());
+            sourceCode = "No sourcecode available"; // TODO: Source code should always be present, otherwise a error exists.
+            // TODO: Explore, why it is that some source codes are not available; guess its the package name that is not resolved correctly
+            javadoc = "";
         }
-        return SOURCE_CODE_NOT_FOUNT_FOR_METHOD;
+        method.setSourceCode(sourceCode);
+        method.setJavadoc(javadoc);
+        return method;
+    }
+
+    /**
+     * Escapes critical symbols and adds '"' at the beginning and end.
+     * @param text Simple string
+     * @return Cleaned simple string
+     */
+    public String cleanTextForRDF(String text) {
+        text = escapeSourceCode(text);
+        text = "\"" + text + "\"";
+        return text;
     }
 
     /**

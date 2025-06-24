@@ -40,6 +40,98 @@ To use this annotation processor for your application, add the dependency as wel
 </plugin>
 ```
 
+### In-Application Usage
+When included compiled in target app, the created json-files are accessible in the Classpath + "json" directory.
+The files' names are the package names + class name. 
+
+To access the files during runtime, you must read the file of the requested class and then you can access the JSON
+with a library of your choise, e.g. Jackson. The JSON's schema is as follows:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Methods",
+  "type": "object",
+  "properties": {
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fqn": {
+            "type": "string"
+          },
+          "methodName": {
+            "type": "string"
+          },
+          "returnType": {
+            "type": "string"
+          },
+          "sourceCode": {
+            "type": "string"
+          },
+          "parameterTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "fqn",
+          "methodName",
+          "returnType",
+          "sourceCode",
+          "parameterTypes"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["methods"],
+  "additionalProperties": false
+}
+```
+
+### Exemplary property access
+
+Given the following JSON (`eu.wdaqua.qanary.web.QanaryWebConfiguration.json`):
+```json
+{
+  "methods": [
+    {
+      "fqn": "eu.wdaqua.qanary.web.QanaryWebConfiguration",
+      "methodName": "addViewControllers",
+      "returnType": "void",
+      "sourceCode": "public void addViewControllers(ViewControllerRegistry registry) {      registry.addViewController(\"/static\").setViewName(\"static\");  }",
+      "parameterTypes": [
+        "org.springframework.web.servlet.config.annotation.ViewControllerRegistry"
+      ]
+    }
+  ]
+}
+```
+#### Via JsonMethodFileReader
+
+With this Processor, we also provide a FileReader (JsonMethodFileReader) that returns a MethodInfo object 
+for a requested method. With `JsonMethodFileReader.getMethod(fqn, methodName, params)` the requested method
+will be searched for.
+
+#### Own implementation
+
+If you rather implement the retrieval function yourself, you can take the following snippet as a starting point:
+
+```java
+    public static String getFileContent(String fqn) throws IOException {
+    String resourcePath = "/jsons/" + fqn + ".json"; // Move the "jsons" to a final variable
+
+    try (InputStream stream = getClass().getClassLoader().getResourceAsStream(resourcePath);
+         BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+        return reader.lines().collect(Collectors.joining("\n"));
+    }
+}
+```
+
 ## Example for MethodRegistry
 
 When the project is compiled, a MethodRegistry class should've been generated, looking as follows:

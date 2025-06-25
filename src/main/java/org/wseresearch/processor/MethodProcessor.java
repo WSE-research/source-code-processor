@@ -30,6 +30,7 @@ public class MethodProcessor extends AbstractProcessor {
     private List<MethodInfo> methods = new ArrayList<>();
     private final String SOURCE_CODE_NOT_FOUND_FOR_CLASS = "No source code available";
     private final String SOURCE_CODE_NOT_FOUNT_FOR_METHOD = "Source code not found";
+    private final String JAVADOC_NOT_EXISTENT_FOR_METHOD = "No javadoc existing for method";
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -45,8 +46,9 @@ public class MethodProcessor extends AbstractProcessor {
                                 .stream()
                                 .map(p -> p.asType().toString())
                                 .collect(Collectors.toList());
-                        MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, parameterTypes);
-                        methodInfo = addInformationToMethod(methodInfo);
+                        String sourceCode = cleanTextForRDF(getSourceCode(fqn, methodName, parameterTypes));
+                        String javadoc = cleanTextForRDF(getDocstring(fqn, methodName, parameterTypes));
+                        MethodInfo methodInfo = new MethodInfo(fqn, methodName, returnType, sourceCode, javadoc, parameterTypes);
                         addMethodToMap(methodInfo);
                         this.methods.add(methodInfo);
                     }
@@ -112,60 +114,6 @@ public class MethodProcessor extends AbstractProcessor {
                 .replace("\n", "  ");
     }
 
-    public Optional<MethodDeclaration> getMethodDeclaration(String fqn, String methodName, List<String> parameterTypes) throws SourceCodeNotExistentException {
-        Path sourceFilePath = getSourceFilePath(fqn);
-        CompilationUnit cu;
-        try {
-            // Transform source file to compilationUnit
-            cu = com.github.javaparser.StaticJavaParser.parse(sourceFilePath.toFile());
-        } catch (IOException e) {
-            throw new SourceCodeNotExistentException(SOURCE_CODE_NOT_FOUND_FOR_CLASS);
-        }
-        return findMethodInCompilationUnit(cu, methodName, parameterTypes);
-    }
-
-    public MethodInfo addInformationToMethod(MethodInfo method) {
-        String sourceCode, javadoc;
-        try {
-            Optional<MethodDeclaration> md = getMethodDeclaration(method.getFqn(), method.getMethodName(), method.getParameterTypes());
-            if (md.isPresent()) {
-                MethodDeclaration methodDeclaration = md.get();
-                if(methodDeclaration.getJavadoc().isPresent()) {
-                    javadoc = cleanTextForRDF(methodDeclaration.getJavadoc().get().toText());
-                } else {
-                    javadoc = "";
-                }
-                sourceCode = cleanTextForRDF(
-                        methodDeclaration.getDeclarationAsString(
-                                true,
-                                true,
-                                true)
-                                + " " + methodDeclaration.getBody().orElse(null)
-                );
-            }
-            else throw new SourceCodeNotExistentException(SOURCE_CODE_NOT_FOUNT_FOR_METHOD);
-        } catch (SourceCodeNotExistentException e) {
-            logger.error("Failed to find source code for fqn: {}, methodName: {}, parameterTypes: {}", method.getFqn(), method.getMethodName(), method.getParameterTypes());
-            sourceCode = "No sourcecode available"; // TODO: Source code should always be present, otherwise a error exists.
-            // TODO: Explore, why it is that some source codes are not available; guess its the package name that is not resolved correctly
-            javadoc = "";
-        }
-        method.setSourceCode(sourceCode);
-        method.setJavadoc(javadoc);
-        return method;
-    }
-
-    /**
-     * Escapes critical symbols and adds '"' at the beginning and end.
-     * @param text Simple string
-     * @return Cleaned simple string
-     */
-    public String cleanTextForRDF(String text) {
-        text = escapeSourceCode(text);
-        text = "\"" + text + "\"";
-        return text;
-    }
-
     /**
      * @param cu             CompilationUnit of the class file where the requested method should be accessible
      * @param methodName     Name of the method (i.e. getA - not getA())
@@ -193,6 +141,52 @@ public class MethodProcessor extends AbstractProcessor {
             }
         }
         return Optional.empty();
+    }
+
+    public String getDocstring(String fqn, String methodName, List<String> parameterTypes) {
+        Path sourceFilePath = getSourceFilePath(fqn);
+        CompilationUnit cu;
+        try {
+            // Transform source file to compilationUnit
+            cu = com.github.javaparser.StaticJavaParser.parse(sourceFilePath.toFile());
+        } catch (IOException e) {
+            return SOURCE_CODE_NOT_FOUND_FOR_CLASS;
+        }
+        Optional<MethodDeclaration> methodDeclaration = findMethodInCompilationUnit(cu, methodName, parameterTypes);
+        if (methodDeclaration.isPresent()) {
+            if (methodDeclaration.get().getJavadoc().isPresent())
+                return methodDeclaration.get().getJavadoc().get().toText();
+        }
+        return JAVADOC_NOT_EXISTENT_FOR_METHOD;
+    }
+
+    public String getSourceCode(String fqn, String methodName, List<String> parameterTypes) {
+        Path sourceFilePath = getSourceFilePath(fqn);
+        CompilationUnit cu;
+        try {
+            // Transform source file to compilationUnit
+            cu = com.github.javaparser.StaticJavaParser.parse(sourceFilePath.toFile());
+        } catch (IOException e) {
+            return SOURCE_CODE_NOT_FOUND_FOR_CLASS;
+        }
+        Optional<MethodDeclaration> methodDeclaration = findMethodInCompilationUnit(cu, methodName, parameterTypes);
+        if (methodDeclaration.isPresent()) {
+            MethodDeclaration md = methodDeclaration.get();
+            return (md.getDeclarationAsString(true, true, true) + " " + md.getBody().orElse(null));
+        }
+        return SOURCE_CODE_NOT_FOUNT_FOR_METHOD;
+    }
+
+    /**
+     * Escapes critical symbols and adds '"' at the beginning and end.
+     *
+     * @param text Simple string
+     * @return Cleaned simple string
+     */
+    public String cleanTextForRDF(String text) {
+        text = escapeSourceCode(text);
+        text = "\"" + text + "\"";
+        return text;
     }
 
     /**

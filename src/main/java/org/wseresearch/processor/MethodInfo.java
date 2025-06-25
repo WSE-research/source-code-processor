@@ -23,13 +23,6 @@ public class MethodInfo {
         this.parameterTypes = parameterTypes != null ? parameterTypes : new ArrayList<>();
     }
 
-    public MethodInfo(String fqn, String methodName, String returnType, List<String> parameterTypes) {
-        this.fqn = fqn;
-        this.methodName = methodName;
-        this.returnType = returnType;
-        this.parameterTypes = parameterTypes != null ? parameterTypes : new ArrayList<>();
-    }
-
     public String getJavadoc() {
         return javadoc;
     }

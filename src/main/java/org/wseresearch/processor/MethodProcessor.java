@@ -12,6 +12,9 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
@@ -42,9 +45,9 @@ public class MethodProcessor extends AbstractProcessor {
                         String fqn = ((TypeElement) e).getQualifiedName().toString();
                         String methodName = method.getSimpleName().toString();
                         String returnType = method.getReturnType().toString();
-                        List<String> parameterTypes = method.getParameters()
-                                .stream()
-                                .map(p -> p.asType().toString())
+                        List<String> parameterTypes = method.getParameters().stream()
+                                .map(p -> TypeNameUtils.getTypeName(p.asType()))
+                                .map(TypeNameUtils::normalize)
                                 .collect(Collectors.toList());
                         String sourceCode = cleanTextForRDF(getSourceCode(fqn, methodName, parameterTypes));
                         String javadoc = cleanTextForRDF(getDocstring(fqn, methodName, parameterTypes));

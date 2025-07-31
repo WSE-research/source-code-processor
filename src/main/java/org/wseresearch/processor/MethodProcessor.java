@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 @AutoService(Processor.class)
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
+@SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class MethodProcessor extends AbstractProcessor {
 
     private final static Logger logger = LoggerFactory.getLogger(MethodProcessor.class);
